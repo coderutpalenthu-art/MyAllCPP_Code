@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>📱 Battery Monitor - 4 Decimal Places</title>
+    <style>
+        * { box-sizing: border-box; user-select: none; }
+        body {
+            font-family: 'Segoe UI', system-ui;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .battery-card {
+            max-width: 450px;
+            width: 100%;
+            background: rgba(30,30,46,0.95);
+            backdrop-filter: blur(12px);
+            border-radius: 48px;
+            padding: 30px 25px;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .battery-icon { width: 120px; margin: 0 auto 20px; position: relative; }
+        .battery-body {
+            background: #333;
+            border-radius: 18px;
+            height: 55px;
+            width: 100%;
+            border: 3px solid #fff;
+            overflow: hidden;
+            position: relative;
+        }
+        .battery-level {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #00e676, #00c853);
+            transition: width 0.3s ease;
+            border-radius: 14px;
+        }
+        .battery-tip {
+            width: 14px;
+            height: 24px;
+            background: #fff;
+            position: absolute;
+            right: -16px;
+            top: 14px;
+            border-radius: 4px;
+        }
+        .lightning {
+            position: absolute;
+            font-size: 30px;
+            right: -40px;
+            top: 10px;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.1); }
+        }
+        .percentage {
+            font-size: 56px;
+            font-weight: 800;
+            margin: 20px 0 10px;
+            color: white;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+        }
+        .percentage small { font-size: 20px; }
+        .status {
+            font-size: 18px;
+            padding: 10px 20px;
+            border-radius: 40px;
+            display: inline-block;
+            margin: 15px 0;
+            font-weight: 600;
+        }
+        .charging { background: #00e67620; color: #00e676; border: 2px solid #00e676; animation: glow 1s infinite; }
+        .discharging { background: #ff572220; color: #ff7043; border: 2px solid #ff7043; }
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px #00e676; }
+            50% { box-shadow: 0 0 20px #00e676; }
+        }
+        .speed-card {
+            background: linear-gradient(135deg, rgba(0,230,118,0.1), rgba(0,176,255,0.1));
+            border-radius: 24px;
+            padding: 18px;
+            margin: 20px 0;
+        }
+        .eta-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .eta-box {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 10px;
+        }
+        .eta-label { font-size: 11px; opacity: 0.7; }
+        .eta-value { font-size: 20px; font-weight: bold; color: #00e676; }
+        .charging-speed { font-size: 28px; font-weight: bold; margin: 8px 0; color: #00e676; }
+        .speed-rating {
+            display: inline-block;
+            padding: 6px 18px;
+            border-radius: 40px;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 8px 0;
+        }
+        .rating-very-fast { background: #d4ff00; color: #000; animation: pulse 0.5s infinite; }
+        .rating-fast { background: #00e676; color: #000; }
+        .rating-medium { background: #ffc107; color: #000; }
+        .rating-slow { background: #ff9800; color: #000; }
+        .rating-too-slow { background: #f44336; color: #fff; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+        .recommendation {
+            margin-top: 12px;
+            font-size: 12px;
+            padding: 8px;
+            border-radius: 16px;
+            background: rgba(0,0,0,0.3);
+        }
+        .info {
+            font-size: 11px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            color: #aaa;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        button:hover { transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+<div class="battery-card">
+    <div class="battery-icon">
+        <div class="battery-body">
+            <div class="battery-level" id="batteryFill"></div>
+            <div class="battery-tip"></div>
+        </div>
+        <div class="lightning" id="lightning" style="display: none;">⚡</div>
+    </div>
+
+    <div class="percentage" id="batteryPercent">0.0000<small>%</small></div>
+    <div id="batteryStatus" class="status">—</div>
+
+    <div class="speed-card">
+        <div style="font-size: 13px; opacity: 0.8;">⚡ Charging Speed</div>
+        <div class="charging-speed" id="chargingSpeed">—</div>
+        <div id="speedRating" class="speed-rating">—</div>
+        <div class="eta-container">
+            <div class="eta-box">
+                <div class="eta-label">⏱️ ETA to Full</div>
+                <div class="eta-value" id="etaFull">—</div>
+            </div>
+            <div class="eta-box">
+                <div class="eta-label">📈 Rate (per hour)</div>
+                <div class="eta-value" id="chargeRate">—</div>
+            </div>
+        </div>
+        <div id="recommendation" class="recommendation"></div>
+    </div>
+
+    <button onclick="resetData()">🔄 Reset Stats</button>
+
+    <div class="info">
+        ⚡ 4 decimal places | Speed rating updates every second
+    </div>
+</div>
+
+<script>
+    let lastLevel = null;
+    let lastTime = null;
+    let chargingSpeed = 0;        // % per minute
+    let maxPercent = 0;
+    let minPercent = 100;
+    let lastDisplayedPercent = null;
+
+    // Speed rating logic
+    function getSpeedRating(speed) {
+        if (speed >= 5) return { text: "⚡ VERY FAST", class: "rating-very-fast", rec: "🔥 Super fast charging! Your charger is excellent." };
+        if (speed >= 3) return { text: "✅ FAST", class: "rating-fast", rec: "👍 Great speed, phone will fill quickly." };
+        if (speed >= 1.5) return { text: "📱 MEDIUM", class: "rating-medium", rec: "👌 Standard charging. Good for daily use." };
+        if (speed >= 0.5) return { text: "🐢 SLOW", class: "rating-slow", rec: "⚠️ Consider a better charger or cable." };
+        return { text: "❌ TOO SLOW", class: "rating-too-slow", rec: "🔋 Check charger, cable, or use wall outlet." };
+    }
+
+    function updateUI(percent, isCharging) {
+        // Update percentage with 4 decimal places
+        const percentFormatted = percent.toFixed(4);
+        const percentElem = document.getElementById('batteryPercent');
+        percentElem.innerHTML = `${percentFormatted}<small>%</small>`;
+        
+        // Update battery fill bar
+        const fillElem = document.getElementById('batteryFill');
+        fillElem.style.width = `${percent}%`;
+        
+        // Change color based on level
+        if (percent <= 15) fillElem.style.background = "linear-gradient(90deg, #f44336, #d32f2f)";
+        else if (percent <= 30) fillElem.style.background = "linear-gradient(90deg, #ff9800, #f57c00)";
+        else fillElem.style.background = "linear-gradient(90deg, #00e676, #00c853)";
+        
+        // Charging animation & status
+        const statusElem = document.getElementById('batteryStatus');
+        const lightning = document.getElementById('lightning');
+        if (isCharging) {
+            fillElem.classList.add('charging-animation');
+            lightning.style.display = 'block';
+            statusElem.innerHTML = "⚡ CHARGING ⚡";
+            statusElem.classList.remove('discharging');
+            statusElem.classList.add('charging');
+        } else {
+            fillElem.classList.remove('charging-animation');
+            lightning.style.display = 'none';
+            statusElem.innerHTML = "🔋 DISCHARGING 🔋";
+            statusElem.classList.remove('charging');
+            statusElem.classList.add('discharging');
+        }
+        
+        // Update max/min (only when charging or discharging normally)
+        if (percent > maxPercent) maxPercent = percent;
+        if (percent < minPercent) minPercent = percent;
+        
+        // For display we don't show max/min now (removed)
+    }
+    
+    function updateChargingSpeed(currentPercent, isCharging, timestamp) {
+        if (!isCharging) {
+            chargingSpeed = 0;
+            document.getElementById('chargingSpeed').innerHTML = '🔌 Not charging';
+            document.getElementById('chargeRate').innerHTML = '—';
+            document.getElementById('etaFull').innerHTML = '—';
+            const rating = getSpeedRating(0);
+            document.getElementById('speedRating').textContent = rating.text;
+            document.getElementById('speedRating').className = `speed-rating ${rating.class}`;
+            document.getElementById('recommendation').textContent = rating.rec;
+            return;
+        }
+        
+        // Calculate speed only if we have previous data and battery increased
+        if (lastLevel !== null && lastTime !== null && currentPercent > lastLevel) {
+            const timeDiffMinutes = (timestamp - lastTime) / 60000;
+            const levelDiff = currentPercent - lastLevel;
+            
+            if (timeDiffMinutes > 0 && levelDiff > 0) {
+                const instantSpeed = levelDiff / timeDiffMinutes;
+                // Exponential moving average for smoothness
+                if (chargingSpeed === 0) {
+                    chargingSpeed = instantSpeed;
+                } else {
+                    chargingSpeed = chargingSpeed * 0.7 + instantSpeed * 0.3;
+                }
+                // Clamp to realistic range
+                chargingSpeed = Math.min(15, Math.max(0.1, chargingSpeed));
+                
+                // Update UI with speed
+                document.getElementById('chargingSpeed').innerHTML = `${chargingSpeed.toFixed(2)}%/min`;
+                document.getElementById('chargeRate').innerHTML = `${(chargingSpeed * 60).toFixed(1)}%/hour`;
+                
+                // Calculate ETA
+                const remaining = 100 - currentPercent;
+                let minutesLeft = remaining / chargingSpeed;
+                let etaText = '';
+                if (minutesLeft < 1) etaText = 'Less than 1 min';
+                else if (minutesLeft < 60) etaText = `${Math.floor(minutesLeft)} min`;
+                else {
+                    const hours = Math.floor(minutesLeft / 60);
+                    const mins = Math.floor(minutesLeft % 60);
+                    etaText = `${hours}h ${mins}m`;
+                }
+                document.getElementById('etaFull').innerHTML = etaText;
+                
+                // Speed rating
+                const rating = getSpeedRating(chargingSpeed);
+                document.getElementById('speedRating').textContent = rating.text;
+                document.getElementById('speedRating').className = `speed-rating ${rating.class}`;
+                document.getElementById('recommendation').textContent = rating.rec;
+            }
+        } else if (chargingSpeed === 0) {
+            // Still charging but no speed yet (just started)
+            document.getElementById('chargingSpeed').innerHTML = 'Calculating...';
+            document.getElementById('chargeRate').innerHTML = '—';
+            document.getElementById('etaFull').innerHTML = '—';
+        }
+    }
+
+    async function refreshBattery() {
+        try {
+            const battery = await navigator.getBattery();
+            const level = battery.level * 100;
+            const isCharging = battery.charging;
+            const now = Date.now();
+            
+            updateUI(level, isCharging);
+            updateChargingSpeed(level, isCharging, now);
+            
+            // Store for next speed calculation
+            lastLevel = level;
+            lastTime = now;
+        } catch (err) {
+            console.error("Battery API error:", err);
+            document.getElementById('batteryPercent').innerHTML = "Error<small>%</small>";
+            document.getElementById('batteryStatus').innerHTML = "⚠️ API not supported";
+        }
+    }
+    
+    function resetData() {
+        chargingSpeed = 0;
+        lastLevel = null;
+        lastTime = null;
+        maxPercent = 0;
+        minPercent = 100;
+        document.getElementById('chargingSpeed').innerHTML = '—';
+        document.getElementById('chargeRate').innerHTML = '—';
+        document.getElementById('etaFull').innerHTML = '—';
+        const rating = getSpeedRating(0);
+        document.getElementById('speedRating').textContent = rating.text;
+        document.getElementById('speedRating').className = `speed-rating ${rating.class}`;
+        document.getElementById('recommendation').textContent = rating.rec;
+        // Refresh again to resample
+        refreshBattery();
+    }
+    
+    // Initialize and listen for changes
+    async function init() {
+        if (!navigator.getBattery) {
+            document.getElementById('batteryPercent').innerHTML = "Not supported<small>%</small>";
+            document.getElementById('batteryStatus').innerHTML = "❌ Battery API unavailable";
+            return;
+        }
+        const battery = await navigator.getBattery();
+        
+        // Refresh on any change
+        const refreshHandler = () => refreshBattery();
+        battery.addEventListener('levelchange', refreshHandler);
+        battery.addEventListener('chargingchange', refreshHandler);
+        battery.addEventListener('chargingtimechange', refreshHandler);
+        battery.addEventListener('dischargingtimechange', refreshHandler);
+        
+        // Update every second to ensure smooth decimal updates
+        setInterval(refreshBattery, 1000);
+        refreshBattery();
+    }
+    
+    init();
+</script>
+</body>
+</html>

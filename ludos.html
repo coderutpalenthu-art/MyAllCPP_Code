@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Ludo • 4 Players</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: linear-gradient(145deg, #2b5a3a 0%, #1e3b28 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      padding: 20px;
+      margin: 0;
+    }
+    .game-container {
+      background: #f5e7d3;
+      border-radius: 48px;
+      box-shadow: 0 25px 45px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(255, 255, 200, 0.6);
+      padding: 25px 25px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      max-width: 600px;
+      height: auto;
+      border-radius: 36px;
+      background: #fdf8f0;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.2), 0 15px 25px rgba(0,0,0,0.4);
+      margin-bottom: 18px;
+    }
+    .info-panel {
+      width: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 25px;
+      background: #ecdcc0;
+      border-radius: 60px;
+      padding: 12px 25px;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.3);
+      font-weight: bold;
+      color: #2d3e2b;
+    }
+    .turn-indicator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.4rem;
+      background: #fff3e0;
+      padding: 6px 22px;
+      border-radius: 40px;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.15);
+    }
+    .turn-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid #4a3b2f;
+    }
+    .dice-box {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      background: #ede0c8;
+      border-radius: 36px;
+      padding: 5px 20px;
+    }
+    .dice-value {
+      font-size: 2.5rem;
+      font-weight: 800;
+      min-width: 55px;
+      text-align: center;
+      color: #2c4720;
+      text-shadow: 1px 1px 0 white;
+      letter-spacing: 1px;
+    }
+    button {
+      background: #f9e076;
+      border: none;
+      font-weight: bold;
+      font-size: 1.2rem;
+      padding: 10px 22px;
+      border-radius: 40px;
+      cursor: pointer;
+      background: #ffb347;
+      color: #2e2e1f;
+      box-shadow: 0 5px 0 #cc7f2a, 0 4px 10px rgba(0,0,0,0.3);
+      transition: all 0.08s ease;
+      border: 1px solid #ffe3a5;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    button:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #b45f1a, 0 6px 12px rgba(0,0,0,0.3);
+      background: #ff9f2f;
+    }
+    button:disabled {
+      opacity: 0.5;
+      transform: translateY(2px);
+      box-shadow: 0 3px 0 #7b5620;
+      pointer-events: none;
+      background: #bbb09a;
+      color: #4a4132;
+    }
+    .status-message {
+      font-size: 1rem;
+      background: #f6efdb;
+      padding: 5px 18px;
+      border-radius: 20px;
+      color: #3b4a2c;
+      font-weight: 600;
+    }
+    @media (max-width: 500px) {
+      .info-panel {
+        flex-direction: column;
+        gap: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div style="display: flex; flex-direction: column; align-items: center;">
+  <div class="game-container">
+    <canvas id="ludoCanvas" width="540" height="540" aria-label="Ludo board for 4 players"></canvas>
+    <div class="info-panel">
+      <div class="turn-indicator">
+        <span>🎲</span>
+        <span id="currentPlayerLabel">Red</span>
+        <div class="turn-dot" id="turnColorDot" style="background:#d64045;"></div>
+      </div>
+      <div class="dice-box">
+        <span style="font-size:1.2rem;">Dice</span>
+        <span class="dice-value" id="diceDisplay">⚀</span>
+        <button id="rollButton">🎲 Roll</button>
+      </div>
+      <div class="status-message" id="statusText">Select a piece to move</div>
+    </div>
+  </div>
+  <p style="color:#f0e5c7; margin-top: 8px; font-weight: 500;">👆 Click a glowing piece to move · 4 players take turns</p>
+</div>
+
+<script>
+  (function() {
+    const canvas = document.getElementById('ludoCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // ---------- PLAYER COLORS ----------
+    const PLAYERS = {
+      RED: 0,
+      GREEN: 1,
+      YELLOW: 2,
+      BLUE: 3
+    };
+    const playerNames = ["Red", "Green", "Yellow", "Blue"];
+    const playerColors = ["#d64045", "#2e7d32", "#f9a825", "#1565c0"];
+    const playerLight = ["#f28b82", "#81c784", "#ffee58", "#64b5f6"];
+
+    // ---------- GAME STATE ----------
+    let currentPlayer = PLAYERS.RED;        // 0: Red, 1: Green, 2: Yellow, 3: Blue
+    let diceValue = null;                 // 1-6 or null
+    let diceRolled = false;
+    let gameOver = false;
+    let winner = null;
+
+    // Piece positions: each player has 4 pieces (index 0..3)
+    // -1 = in base (home), 0..56 = position on main track (relative to player start)
+    // 57 = in home column (finished, not movable)
+    let pieces = [
+      [-1, -1, -1, -1], // Red
+      [-1, -1, -1, -1], // Green
+      [-1, -1, -1, -1], // Yellow
+      [-1, -1, -1, -1]  // Blue
+    ];
+
+    // Track mapping: 52 common squares + 5 home column steps per player (total 57 steps to finish)
+    const BOARD_SIZE = 52;      // common track length (0..51)
+    const HOME_COLUMN_LENGTH = 5; // steps 52..56 are home column (safe)
+    const FINISH_POS = 57;      // after home column
+
+    // Starting positions on main track for each player (index into common track 0..51)
+    const startPositions = [0, 13, 26, 39]; // Red starts at 0, Green 13, Yellow 26, Blue 39
+
+    // Player entry point: when leaving base, piece placed at start position (relative to global track)
+    // For movement we store global position: 0..56 (0-51 common, 52-56 home column)
+    // We'll convert between global position and player-relative.
+
+    // ---------- HELPER: player global start ----------
+    function getGlobalStart(player) {
+      return startPositions[player];
+    }
+
+    // Convert global position (0..56) to player-relative track position (0..51 then home)
+    function globalToRelative(globalPos, player) {
+      if (globalPos >= 52 && globalPos <= 56) return globalPos; // home column same for all
+      let start = getGlobalStart(player);
+      return (globalPos - start + BOARD_SIZE) % BOARD_SIZE;
+    }
+
+    function relativeToGlobal(relativePos, player) {
+      if (relativePos >= 52 && relativePos <= 56) return relativePos;
+      let start = getGlobalStart(player);
+      return (start + relativePos) % BOARD_SIZE;
+    }
+
+    // Check if a global position is on a star (safe square) - predefined stars on common track
+    const starSquares = new Set([8, 21, 34, 47]); // typical Ludo stars
+    function isStar(globalPos) {
+      return globalPos >= 0 && globalPos <= 51 && starSquares.has(globalPos);
+    }
+
+    // ---------- MOVEMENT LOGIC ----------
+    function canMovePiece(player, pieceIndex, steps) {
+      if (gameOver) return false;
+      let pos = pieces[player][pieceIndex];
+      if (pos === FINISH_POS) return false; // already finished
+
+      // If in base: need a 6 to move out
+      if (pos === -1) {
+        return steps === 6;
+      }
+
+      // Calculate new global position
+      let newGlobal = pos + steps;
+      // If passes finish (beyond 56), cannot move
+      if (newGlobal > 56) return false;
+
+      // Check if landing on own piece (blocked by own piece? Usually allowed in many Ludo, but we allow stacking? We'll disallow landing on exact same square with own piece)
+      for (let i = 0; i < 4; i++) {
+        if (i !== pieceIndex && pieces[player][i] === newGlobal) {
+          return false; // occupied by own piece
+        }
+      }
+
+      // Home column rules: only allowed if piece is already in home column or entering exactly
+      if (newGlobal >= 52) {
+        // Must enter home column only if pos was already >=52 or exactly landing on home entry.
+        // Actually if piece is on common track and tries to enter home: allowed only if steps land exactly on 52-56.
+        if (pos < 52 && newGlobal >= 52) {
+          // allowed only if landing exactly on home entry (52) or beyond? Typically you need exact step into home column.
+          // We'll allow entering home column only if newGlobal <=56.
+          return true;
+        }
+        // moving within home column: allowed if newGlobal <=56
+        return true;
+      }
+
+      // Common track movement: check capture possibility or safe squares
+      return true;
+    }
+
+    function movePiece(player, pieceIndex) {
+      if (!diceRolled || diceValue === null || gameOver) return false;
+      if (!canMovePiece(player, pieceIndex, diceValue)) return false;
+
+      let pos = pieces[player][pieceIndex];
+      let steps = diceValue;
+
+      // Move from base
+      if (pos === -1) {
+        let startGlobal = getGlobalStart(player);
+        // Check if start square occupied by own piece? (unlikely but possible)
+        for (let i = 0; i < 4; i++) {
+          if (pieces[player][i] === startGlobal) return false;
+        }
+        // Capture opponent if present
+        captureOpponentAt(startGlobal, player);
+        pieces[player][pieceIndex] = startGlobal;
+      } else {
+        let newGlobal = pos + steps;
+        if (newGlobal > 56) return false;
+
+        // Capture on common track (excluding home column and stars)
+        if (newGlobal <= 51 && !isStar(newGlobal)) {
+          captureOpponentAt(newGlobal, player);
+        } else if (newGlobal <= 51 && isStar(newGlobal)) {
+          // Star is safe, no capture
+        }
+        // Home column no capture.
+
+        // Check if piece reaches exactly 56 (finish)
+        if (newGlobal === 56) {
+          pieces[player][pieceIndex] = FINISH_POS; // finished
+        } else {
+          pieces[player][pieceIndex] = newGlobal;
+        }
+      }
+
+      // After moving, check if player gets another turn on rolling 6 (and not game over)
+      let extraTurn = (diceValue === 6 && !gameOver && !checkPlayerWin(player));
+      // Reset dice for next roll unless extra turn
+      diceValue = null;
+      diceRolled = false;
+
+      // Check win condition
+      if (checkPlayerWin(player)) {
+        gameOver = true;
+        winner = player;
+        diceValue = null;
+        diceRolled = false;
+        updateUI();
+        drawBoard();
+        return true;
+      }
+
+      if (!extraTurn) {
+        // Move to next player
+        currentPlayer = (currentPlayer + 1) % 4;
+        diceValue = null;
+        diceRolled = false;
+      } else {
+        // Extra turn: keep same player, but dice must be rolled again
+        diceValue = null;
+        diceRolled = false;
+      }
+
+      updateUI();
+      drawBoard();
+      return true;
+    }
+
+    function captureOpponentAt(globalPos, currentPlayer) {
+      for (let p = 0; p < 4; p++) {
+        if (p === currentPlayer) continue;
+        for (let i = 0; i < 4; i++) {
+          if (pieces[p][i] === globalPos && globalPos >= 0 && globalPos <= 51 && !isStar(globalPos)) {
+            // Send back to base
+            pieces[p][i] = -1;
+          }
+        }
+      }
+    }
+
+    function checkPlayerWin(player) {
+      return pieces[player].every(p => p === FINISH_POS);
+    }
+
+    // ---------- ROLL DICE ----------
+    function rollDice() {
+      if (gameOver) return;
+      if (diceRolled && diceValue !== null) {
+        // Already rolled, must move piece first
+        document.getElementById('statusText').innerText = 'Move a piece first!';
+        return;
+      }
+
+      let roll = Math.floor(Math.random() * 6) + 1;
+      diceValue = roll;
+      diceRolled = true;
+
+      // Check if player has any valid move
+      let hasMove = false;
+      for (let i = 0; i < 4; i++) {
+        if (canMovePiece(currentPlayer, i, roll)) {
+          hasMove = true;
+          break;
+        }
+      }
+
+      if (!hasMove) {
+        // No move possible: skip turn after short delay
+        document.getElementById('statusText').innerText = `No moves for ${playerNames[currentPlayer]}. Turn passes.`;
+        setTimeout(() => {
+          if (gameOver) return;
+          // Pass turn
+          diceValue = null;
+          diceRolled = false;
+          currentPlayer = (currentPlayer + 1) % 4;
+          updateUI();
+          drawBoard();
+        }, 1200);
+      } else {
+        document.getElementById('statusText').innerText = `Select a glowing piece to move.`;
+      }
+      updateUI();
+      drawBoard();
+    }
+
+    // ---------- CANVAS DRAWING ----------
+    const cellSize = canvas.width / 15; // 15x15 grid
+    function drawBoard() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawLudoGrid();
+      drawPieces();
+      drawDiceOnBoard();
+    }
+
+    function drawLudoGrid() {
+      const w = canvas.width;
+      const cs = cellSize;
+
+      // Base board background
+      ctx.fillStyle = '#f9e7c2';
+      ctx.fillRect(0, 0, w, w);
+
+      // Draw colored home areas (corners)
+      const homePositions = [
+        { x: 0, y: 0, color: '#f4cccc', stroke: '#b04545' },       // Red top-left
+        { x: 9 * cs, y: 0, color: '#c8e6c9', stroke: '#2e6230' }, // Green top-right
+        { x: 0, y: 9 * cs, color: '#fff9c4', stroke: '#b68b00' }, // Yellow bottom-left
+        { x: 9 * cs, y: 9 * cs, color: '#bbdefb', stroke: '#0d3f7c' } // Blue bottom-right
+      ];
+
+      homePositions.forEach(h => {
+        ctx.fillStyle = h.color;
+        ctx.fillRect(h.x, h.y, 6 * cs, 6 * cs);
+        ctx.strokeStyle = h.stroke;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(h.x + 1, h.y + 1, 6 * cs - 2, 6 * cs - 2);
+      });
+
+      // Draw grid lines and paths
+      ctx.strokeStyle = '#5d4a32';
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i <= 15; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * cs, 0);
+        ctx.lineTo(i * cs, w);
+        ctx.stroke();
+        ctx.moveTo(0, i * cs);
+        ctx.lineTo(w, i * cs);
+        ctx.stroke();
+      }
+
+      // Draw central home column lines and arrows (simplified)
+      ctx.fillStyle = '#d7b56e';
+      for (let row = 0; row < 15; row++) {
+        for (let col = 0; col < 15; col++) {
+          if ((row >= 6 && row <= 8) || (col >= 6 && col <= 8)) {
+            if ((row >= 0 && row <= 5 && col >= 6 && col <= 8) ||
+                (row >= 9 && row <= 14 && col >= 6 && col <= 8) ||
+                (col >= 0 && col <= 5 && row >= 6 && row <= 8) ||
+                (col >= 9 && col <= 14 && row >= 6 && row <= 8)) {
+              ctx.fillStyle = '#f7eedb';
+              ctx.fillRect(col * cs + 1, row * cs + 1, cs - 2, cs - 2);
+            }
+          }
+        }
+      }
+
+      // Mark star squares
+      starSquares.forEach(starIdx => {
+        let coord = getGridCoordFromGlobal(starIdx);
+        if (coord) {
+          ctx.beginPath();
+          ctx.arc(coord.x + cs/2, coord.y + cs/2, cs*0.3, 0, 2*Math.PI);
+          ctx.fillStyle = '#ffd966';
+          ctx.fill();
+          ctx.strokeStyle = '#b58b2c';
+          ctx.stroke();
+        }
+      });
+
+      // Draw home entry arrows (simplified)
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 12px "Segoe UI"';
+      ctx.fillText('🏠', 6.5*cs, 1.2*cs);
+    }
+
+    function getGridCoordFromGlobal(globalPos) {
+      if (globalPos < 0 || globalPos > 51) return null;
+      // Map global index 0..51 to 15x15 grid coordinates
+      const rowColMap = [
+        [6,1],[6,2],[6,3],[6,4],[6,5], // 0-4
+        [5,6],[4,6],[3,6],[2,6],[1,6],[0,6], // 5-10
+        [0,7],[0,8], // 11-12
+        [1,8],[2,8],[3,8],[4,8],[5,8], // 13-17
+        [6,9],[6,10],[6,11],[6,12],[6,13],[6,14], // 18-23
+        [7,14],[8,14], // 24-25
+        [8,13],[8,12],[8,11],[8,10],[8,9], // 26-30
+        [9,8],[10,8],[11,8],[12,8],[13,8],[14,8], // 31-36
+        [14,7],[14,6], // 37-38
+        [13,6],[12,6],[11,6],[10,6],[9,6], // 39-43
+        [8,5],[8,4],[8,3],[8,2],[8,1],[8,0], // 44-49
+        [7,0],[6,0] // 50-51
+      ];
+      if (globalPos < rowColMap.length) {
+        let [row, col] = rowColMap[globalPos];
+        return { x: col * cellSize, y: row * cellSize };
+      }
+      return null;
+    }
+
+    function getHomeColumnCoord(player, step) {
+      // step 52..56 (home column steps 0..4)
+      if (step < 52 || step > 56) return null;
+      let idx = step - 52;
+      const homeCoords = [
+        [{col:7, row:6},{col:7,row:5},{col:7,row:4},{col:7,row:3},{col:7,row:2}], // Red
+        [{col:8,row:7},{col:9,row:7},{col:10,row:7},{col:11,row:7},{col:12,row:7}], // Green
+        [{col:7,row:8},{col:7,row:9},{col:7,row:10},{col:7,row:11},{col:7,row:12}], // Yellow
+        [{col:6,row:7},{col:5,row:7},{col:4,row:7},{col:3,row:7},{col:2,row:7}]  // Blue
+      ];
+      let pos = homeCoords[player][idx];
+      return { x: pos.col * cellSize, y: pos.row * cellSize };
+    }
+
+    function getPieceCoordinate(player, pieceIndex) {
+      let pos = pieces[player][pieceIndex];
+      if (pos === -1) {
+        // Base position
+        const baseOffsets = [
+          [{dx:1.5, dy:1.5}, {dx:4, dy:1.5}, {dx:1.5, dy:4}, {dx:4, dy:4}], // Red
+          [{dx:10.5, dy:1.5}, {dx:13, dy:1.5}, {dx:10.5, dy:4}, {dx:13, dy:4}],
+          [{dx:1.5, dy:10.5}, {dx:4, dy:10.5}, {dx:1.5, dy:13}, {dx:4, dy:13}],
+          [{dx:10.5, dy:10.5}, {dx:13, dy:10.5}, {dx:10.5, dy:13}, {dx:13, dy:13}]
+        ];
+        let off = baseOffsets[player][pieceIndex];
+        return { x: off.dx * cellSize, y: off.dy * cellSize };
+      } else if (pos >= 52 && pos <= 56) {
+        return getHomeColumnCoord(player, pos);
+      } else if (pos >= 0 && pos <= 51) {
+        return getGridCoordFromGlobal(pos);
+      }
+      return null;
+    }
+
+    function drawPieces() {
+      for (let p = 0; p < 4; p++) {
+        for (let i = 0; i < 4; i++) {
+          let coord = getPieceCoordinate(p, i);
+          if (!coord) continue;
+          let cx = coord.x + cellSize/2;
+          let cy = coord.y + cellSize/2;
+          let radius = cellSize * 0.32;
+
+          // Highlight if movable
+          if (!gameOver && diceRolled && diceValue !== null && p === currentPlayer && canMovePiece(p, i, diceValue)) {
+            ctx.shadowColor = '#fff89a';
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius+2, 0, 2*Math.PI);
+            ctx.fillStyle = '#ffffaa';
+            ctx.fill();
+          }
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius, 0, 2*Math.PI);
+          ctx.fillStyle = playerColors[p];
+          ctx.fill();
+          ctx.strokeStyle = '#2f2f1c';
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+          ctx.fillStyle = 'white';
+          ctx.font = `bold ${cellSize*0.4}px "Segoe UI"`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(i+1, cx, cy-1);
+        }
+      }
+    }
+
+    function drawDiceOnBoard() {
+      if (diceValue !== null) {
+        ctx.font = 'bold 32px "Segoe UI"';
+        ctx.fillStyle = '#222';
+        ctx.fillText(getDiceFace(diceValue), canvas.width-55, 45);
+      }
+    }
+
+    function getDiceFace(val) {
+      const faces = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+      return faces[val-1] || '?';
+    }
+
+    // ---------- UI UPDATE ----------
+    function updateUI() {
+      document.getElementById('currentPlayerLabel').innerText = playerNames[currentPlayer];
+      document.getElementById('turnColorDot').style.backgroundColor = playerColors[currentPlayer];
+      document.getElementById('diceDisplay').innerText = diceValue ? getDiceFace(diceValue) : '⚀';
+      let btn = document.getElementById('rollButton');
+      btn.disabled = (diceRolled && diceValue !== null) || gameOver;
+
+      if (gameOver) {
+        document.getElementById('statusText').innerText = `🏆 ${playerNames[winner]} wins!`;
+      }
+    }
+
+    // ---------- CANVAS CLICK HANDLER ----------
+    canvas.addEventListener('click', (e) => {
+      if (gameOver) return;
+      if (!diceRolled || diceValue === null) {
+        document.getElementById('statusText').innerText = 'Roll dice first!';
+        return;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const mouseX = (e.clientX - rect.left) * scaleX;
+      const mouseY = (e.clientY - rect.top) * scaleY;
+
+      // Check each piece of current player
+      for (let i = 0; i < 4; i++) {
+        let coord = getPieceCoordinate(currentPlayer, i);
+        if (!coord) continue;
+        let cx = coord.x + cellSize/2;
+        let cy = coord.y + cellSize/2;
+        let dist = Math.hypot(mouseX - cx, mouseY - cy);
+        if (dist < cellSize * 0.45 && canMovePiece(currentPlayer, i, diceValue)) {
+          movePiece(currentPlayer, i);
+          return;
+        }
+      }
+      document.getElementById('statusText').innerText = 'Click a valid glowing piece!';
+    });
+
+    document.getElementById('rollButton').addEventListener('click', rollDice);
+
+    // Initial draw
+    updateUI();
+    drawBoard();
+  })();
+</script>
+</body>
+</html>

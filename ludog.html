@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Game Loader</title>
+
+<style>
+
+body{
+    margin:0;
+    overflow:hidden;
+    background:#1343b4;
+    color:white;
+    font-family:Arial;
+}
+
+/* Loading Screen */
+
+#loadingScreen{
+    position:fixed;
+    inset:0;
+    background:#020617;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    z-index:9999;
+}
+
+.logo{
+    font-size:42px;
+    font-weight:bold;
+    margin-bottom:20px;
+}
+
+.bar{
+    width:300px;
+    height:12px;
+    background:#1e293b;
+    border-radius:20px;
+    overflow:hidden;
+}
+
+.progress{
+    width:0%;
+    height:100%;
+    background:#3b82f6;
+    transition:width .2s;
+}
+
+/* Game */
+
+#game{
+    display:none;
+    width:100vw;
+    height:100vh;
+    justify-content:center;
+    align-items:center;
+    font-size:50px;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="loadingScreen">
+    <div class="logo">GAME LOADING</div>
+
+    <div class="bar">
+        <div class="progress" id="progress"></div>
+    </div>
+
+    <p>Initializing...</p>
+</div>
+
+<div id="game">
+    🎮 GAME STARTED
+</div>
+
+<script>
+
+/* =========================================
+   SAFE AD REMOVAL
+========================================= */
+
+function removeAds() {
+
+    /* remove iframes from known ad domains */
+    document.querySelectorAll("iframe").forEach(frame => {
+
+        const src = frame.src || "";
+
+        if(
+            src.includes("doubleclick.net") ||
+            src.includes("googlesyndication") ||
+            src.includes("googleads")
+        ){
+            frame.remove();
+        }
+
+    });
+
+    /* remove obvious ad containers only */
+    document.querySelectorAll(".adsbygoogle").forEach(el=>{
+        el.remove();
+    });
+
+}
+
+/* initial cleanup */
+removeAds();
+
+/* watch future injections */
+const observer = new MutationObserver(()=>{
+
+    removeAds();
+
+});
+
+observer.observe(document.body,{
+    childList:true,
+    subtree:true
+});
+
+
+/* =========================================
+   LOADING SIMULATION
+========================================= */
+
+const progress = document.getElementById("progress");
+
+let value = 0;
+
+const loader = setInterval(()=>{
+
+    value += 10;
+
+    progress.style.width = value + "%";
+
+    if(value >= 100){
+
+        clearInterval(loader);
+
+        setTimeout(()=>{
+
+            document.getElementById("loadingScreen").style.display = "none";
+
+            document.getElementById("game").style.display = "flex";
+
+        },500);
+
+    }
+
+},200);
+
+</script>
+
+</body>
+</html>
